@@ -1,103 +1,180 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>집회 PDF 다운로더</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        input[type="text"], input[type="file"] {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-        }
-        input[type="submit"], button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            cursor: pointer;
-            margin-bottom: 10px;
-        }
-        input[type="submit"]:hover, button:hover {
-            background-color: #45a049;
-        }
-        .section {
-            margin-bottom: 30px;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        .flash-message {
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-        }
-        .success {
-            background-color: #dff0d8;
-            border-color: #d6e9c6;
-            color: #3c763d;
-        }
-        .error {
-            background-color: #f2dede;
-            border-color: #ebccd1;
-            color: #a94442;
-        }
-        .analyze-btn {
-            background-color: #2196F3;
-            width: 100%;
-            margin-top: 20px;
-        }
-        .analyze-btn:hover {
-            background-color: #1976D2;
-        }
-    </style>
+   <title>집회 PDF 다운로더</title>
+   <style>
+       /* 기존 스타일 유지 */
+       body {
+           font-family: Arial, sans-serif;
+           max-width: 1200px;
+           margin: 0 auto;
+           padding: 20px;
+       }
+       
+       .container {
+           display: flex;
+           gap: 20px;
+       }
+       
+       .column {
+           flex: 1;
+           display: flex;
+           flex-direction: column;
+       }
+
+       .form-group {
+           margin-bottom: 20px;
+       }
+
+       .url-input {
+           width: 80%;
+           padding: 6px;
+           margin-bottom: 8px;
+           margin-right: 10px;
+       }
+   
+       .url-form-group {
+           display: flex;
+           flex-direction: column;
+           align-items: flex-start;
+       }
+
+       input[type="file"] {
+           width: 100%;
+           padding: 8px;
+           margin-bottom: 10px;
+       }
+
+       input[type="submit"], button {
+           background-color: #4CAF50;
+           color: white;
+           padding: 10px 20px;
+           border: none;
+           cursor: pointer;
+           margin-bottom: 10px;
+       }
+
+       input[type="submit"]:hover, button:hover {
+           background-color: #45a049;
+       }
+
+       .section {
+           margin-bottom: 30px;
+           padding: 20px;
+           border: 1px solid #ddd;
+           border-radius: 5px;
+       }
+
+       .pdf-viewer {
+           width: 100%;
+           height: 800px;
+       }
+
+       .flash-message {
+           padding: 10px;
+           margin-bottom: 20px;
+           border-radius: 5px;
+       }
+
+       .success {
+           background-color: #dff0d8;
+           border-color: #d6e9c6;
+           color: #3c763d;
+       }
+
+       .error {
+           background-color: #f2dede;
+           border-color: #ebccd1;
+           color: #a94442;
+       }
+
+       .analyze-btn {
+           background-color: #2196F3;
+           width: 100%;
+           margin-top: 20px;
+       }
+
+       .analyze-btn:hover {
+           background-color: #1976D2;
+       }
+   </style>
 </head>
 <body>
-    <h1>집회 PDF 다운로더</h1>
-    
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="flash-message {{ category }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
+   <h1>집회 PDF 다운로더</h1>
+   
+   {% with messages = get_flashed_messages(with_categories=true) %}
+       {% if messages %}
+           {% for category, message in messages %}
+               <div class="flash-message {{ category }}">{{ message }}</div>
+           {% endfor %}
+       {% endif %}
+   {% endwith %}
 
-    <div class="section">
-        <h2>URL로 PDF 다운로드</h2>
-        <form method="POST">
-            <div class="form-group">
-                <label for="url">페이지 URL:</label>
-                <input type="text" id="url" name="url" placeholder="URL을 입력하세요">
-            </div>
-            <input type="submit" value="URL로 다운로드">
-        </form>
-    </div>
+   <div class="container">
+       <!-- 왼쪽 컬럼 -->
+       <div class="column">
+           <div class="section">
+               <h2>URL로 PDF 다운로드</h2>
+               <form method="POST">
+                   <div class="url-form-group">
+                       <label for="url">페이지 URL:</label>
+                       <input type="text" 
+                              id="url" 
+                              name="url" 
+                              placeholder="URL을 입력하세요" 
+                              class="url-input">
+                   </div>
+                   <input type="submit" value="URL로 다운로드">
+               </form>
+           </div>
 
-    <div class="section">
-        <h2>PDF 파일 직접 업로드</h2>
-        <form method="POST" enctype="multipart/form-data">
-            <div class="form-group">
-                <label for="file">PDF 파일 선택:</label>
-                <input type="file" id="file" name="file" accept=".pdf">
-            </div>
-            <input type="submit" value="파일 업로드">
-        </form>
-    </div>
+           <div class="section">
+               <h2>PDF 파일 직접 업로드</h2>
+               <form method="POST" enctype="multipart/form-data">
+                   <div class="form-group">
+                       <label for="file">PDF 파일 선택:</label>
+                       <input type="file" id="file" name="file" accept=".pdf">
+                   </div>
+                   <input type="submit" value="파일 업로드">
+               </form>
+           </div>
 
-    <div class="section">
-        <h2>PDF 분석</h2>
-        <p>저장된 PDF 파일을 분석하여 집회 정보를 추출합니다.</p>
-        <form method="POST" action="{{ url_for('analyze_pdf') }}">
-            <button type="submit" class="analyze-btn">PDF 분석 시작</button>
-        </form>
-    </div>
+           <div class="section">
+               <h2>PDF 분석</h2>
+               <p>저장된 PDF 파일을 분석하여 집회 정보를 추출합니다.(30초 소요)</p>
+               <form method="POST" action="{{ url_for('analyze_pdf') }}">
+                   <button type="submit" class="analyze-btn">PDF 분석 시작</button>
+               </form>
+           </div>
+       </div>
+
+       <!-- 오른쪽 컬럼 -->
+       <div class="column">
+           <div class="section">
+               <h2>현재 업로드 PDF 파일</h2>
+               {% if 'protest-info-pdf.pdf' in url_for('static', filename='pdf/protest-info-pdf.pdf') %}
+                   <div class="pdf-viewer">
+                       <embed 
+                           src="{{ url_for('static', filename='pdf/protest-info-pdf.pdf') }}" 
+                           type="application/pdf"
+                           width="100%"
+                           height="100%"
+                       >
+                   </div>
+               {% else %}
+                   <p>저장된 PDF 파일이 없습니다.</p>
+               {% endif %}
+           </div>
+       </div>
+   </div>
+
+   {% with messages = get_flashed_messages(with_categories=true) %}
+       {% if messages %}
+           {% for category, message in messages %}
+               <div class="flash-message {{ category }}">{{ message }}</div>
+           {% endfor %}
+       {% endif %}
+   {% endwith %}
+
 </body>
 </html>
