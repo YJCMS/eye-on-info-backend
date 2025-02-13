@@ -5,10 +5,10 @@ import os
 
 crawl_bp = Blueprint('crawl', __name__)
 
-@crawl_bp.route('/')
+@crawl_bp.route('/crawl')
 def crawl_image():
     service = CrawlService()
-    img_url = service.get_bcontent_image(Config.TARGET_URL)
+    img_url = service.get_bcontent_image(Config.TARGET_INFO_URL)
     print(f"최종 이미지 URL: {img_url}")
     
     if img_url:
