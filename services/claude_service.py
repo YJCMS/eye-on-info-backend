@@ -40,7 +40,7 @@ class ClaudeService:
 
             # Sonnet 모델용 API 요청 데이터
             data = {
-                'model': 'claude-3-sonnet-20240229',  # Sonnet 모델로 변경
+                'model': 'claude-3-5-sonnet-20241022',  # Sonnet 모델로 변경
                 'max_tokens': 4096,
                 'messages': [{
                     'role': 'user',
