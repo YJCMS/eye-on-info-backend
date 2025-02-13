@@ -100,8 +100,8 @@
    </style>
 </head>
 <body>
-   <h1>집회 PDF 다운로더</h1>
-   
+   <h1>집회 정보 PDF 업로드 및 분석</h1>
+   <h3>(파일 업로드는 "URL"과 "첨부" 중 한 방법만 사용, 업로드 후 [PDF 분석 시작] 버튼 누르기)</h3>
    {% with messages = get_flashed_messages(with_categories=true) %}
        {% if messages %}
            {% for category, message in messages %}
@@ -140,8 +140,8 @@
            </div>
 
            <div class="section">
-               <h2>PDF 분석</h2>
-               <p>저장된 PDF 파일을 분석하여 집회 정보를 추출합니다.(30초 소요)</p>
+               <h2>PDF 분석 및 결과 전송</h2>
+               <p>저장된 PDF 파일의 집회 정보를 추출하고 서버로 전송합니다.(30초 소요)</p>
                <form method="POST" action="{{ url_for('analyze_pdf') }}">
                    <button type="submit" class="analyze-btn">PDF 분석 시작</button>
                </form>
