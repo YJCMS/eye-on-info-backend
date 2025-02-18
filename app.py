@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, flash, url_for, redirect
+from flask import Flask, render_template, request, flash, url_for, redirect, jsonify
 import os
 from routes.crawl_routes import crawl_bp
 from routes.analysis_routes import analysis_bp
 from services.pdf_analysis_service import PDFAnalysisService
+from services.Protest_info_search_service import ProtestInfoSearchService
 from config import Config
 
 app = Flask(__name__)
@@ -14,12 +15,26 @@ app.secret_key = Config.SECRET_KEY
 pdf_dir = os.path.join('static', 'pdf')
 os.makedirs(pdf_dir, exist_ok=True)
 
+# static/text 폴더가 없으면 생성
+text_dir = os.path.join('static', 'text')
+os.makedirs(text_dir, exist_ok=True)
+
 # PDF 서비스 초기화
 pdf_service = PDFAnalysisService(pdf_dir)
-
+# 검색 서비스 초기화
+search_service = ProtestInfoSearchService()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    news_text = None
+    try:
+        news_file_path = os.path.join('static', 'text', 'news_info.txt')
+        if os.path.exists(news_file_path):
+            with open(news_file_path, 'r', encoding='utf-8') as f:
+                news_text = f.read()
+    except Exception as e:
+        print(f"Error reading news file: {e}")
+
     if request.method == 'POST':
         # URL을 통한 다운로드
         if 'url' in request.form and request.form['url']:
@@ -31,7 +46,36 @@ def index():
             success, message = pdf_service.upload_pdf(request.files['file'])
             flash(message, 'success' if success else 'error')
     
-    return render_template('index.html')
+    return render_template('index.html', news_text=news_text)
+
+@app.route('/get_news_text', methods=['GET'])
+def get_news_text():
+    try:
+        success = search_service.save_protest_info_to_txt()
+        if success:
+            # 파일을 읽어서 내용 반환
+            try:
+                with open('static/text/news_info.txt', 'r', encoding='utf-8') as f:
+                    content = f.read()
+                return jsonify({
+                    "status": "success",
+                    "message": content
+                })
+            except Exception as e:
+                return jsonify({
+                    "status": "error",
+                    "message": f"File read error: {str(e)}"
+                }), 500
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "Failed to fetch and save news information"
+            }), 500
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 @app.route('/analyze_pdf', methods=['POST'])
 def analyze_pdf():
@@ -58,4 +102,3 @@ def analyze_pdf():
 
 if __name__ == '__main__':
     app.run('0.0.0.0', port=5001, debug=True)
-

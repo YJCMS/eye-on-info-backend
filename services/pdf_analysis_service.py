@@ -100,15 +100,24 @@ class PDFAnalysisService:
         with open(pdf_path, 'wb') as f:
             f.write(content)
 
-    def analyze_pdf(self, pdf_path, prompt_file='pdf_analysis_prompt.txt'):
+    # pdf 분석 + 텍스트 파일 분석
+    def analyze_pdf(self, pdf_path, prompt_file='pdf_analysis_prompt.txt', news_file='static/text/news_info.txt'):
         try:
             prompt = load_prompt(prompt_file)
             if not prompt:
                 return None
-
+            
+            
+            # pdf 파일
             pdf_text = self._extract_pdf_text(pdf_path)
             if not pdf_text:
                 return None
+            
+            # 텍스트 파일
+            news_text = self._read_news_text(news_file)
+            if not news_text:
+                print(f"Warning: Could not read news text from {news_file}")
+                news_text = "No news information available."
 
             headers = {
                 'x-api-key': self.api_key,
@@ -124,7 +133,7 @@ class PDFAnalysisService:
                     'content': [
                         {
                             'type': 'text',
-                            'text': f"{prompt}\n\nPDF Content:\n{pdf_text}"
+                            'text': f"{prompt}\n\nPDF Content:\n{pdf_text}\nText file Content:\n{news_text}"
                         }
                     ]
                 }]
@@ -160,6 +169,19 @@ class PDFAnalysisService:
                 return '\n'.join(text)
         except Exception as e:
             print(f"PDF 텍스트 추출 중 오류 발생: {e}")
+            return None
+        
+    # 텍스트 파일 추출(구글 검색)    
+    def _read_news_text(self, news_file):
+        try:
+            if not os.path.exists(news_file):
+                print(f"Text file not found: {news_file}")
+                return None
+                
+            with open(news_file, 'r', encoding='utf-8') as file:
+                return file.read().strip()
+        except Exception as e:
+            print(f"텍스트 파일 읽기 중 오류 발생: {e}")
             return None
         
     def send_to_server(self, analysis_result):
