@@ -149,8 +149,13 @@ class PDFAnalysisService:
                 return None
 
             print("API request successful")
-            print(response.json())
+            # 분석 결과, content의 text 내용만 확인
+            response_data = response.json()
+            text_content = response_data['content'][0]['text']
+            # indent=2로 설정하여 들여쓰기를 적용하고, ensure_ascii=False로 한글이 깨지지 않도록 설정
+            print(json.dumps(json.loads(text_content), indent=2, ensure_ascii=False))
             return response.json()
+            
 
         except Exception as e:
             print(f"PDF 분석 중 예외 발생: {e}")
