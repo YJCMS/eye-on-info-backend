@@ -11,7 +11,7 @@ import os
 class ProtestInfoSearchService:
     def __init__(self):
         self.chrome_options = self._setup_chrome_options()
-        
+
     def _setup_chrome_options(self):
         chrome_options = Options()
         chrome_options.add_argument('--headless')
@@ -24,8 +24,8 @@ class ProtestInfoSearchService:
         return chrome_options
 
     def _get_search_query(self):
-        today = datetime.now().strftime("%Y.%m.%d")
-        return f"[오늘의 주요일정]사회 뉴시스 + {today}"
+        today = datetime.now().strftime("%Y %m월%d일")
+        return f"[오늘의 주요일정]사회 + {today} +site: newsis"
 
     def save_protest_info_to_txt(self, filepath='static/text/news_info.txt'):
         """집회/시위 정보를 텍스트 파일로 저장하는 메서드"""
