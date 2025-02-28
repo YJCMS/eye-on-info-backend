@@ -176,4 +176,5 @@ protest-info-pdf.pdf
 config.py
 .DS_Store
 
-
+text
+test.py

@@ -1,15 +1,11 @@
 from flask import Flask, render_template, request, flash, url_for, redirect, jsonify
 import os
-from routes.crawl_routes import crawl_bp
-from routes.analysis_routes import analysis_bp
 from services.pdf_analysis_service import PDFAnalysisService
 from services.protest_info_search_service import ProtestInfoSearchService
 from services.protest_url_crawler_service import ProtestUrlCrawlerService
 from config import Config
 
 app = Flask(__name__)
-app.register_blueprint(crawl_bp, url_prefix='/api/v1')
-app.register_blueprint(analysis_bp, url_prefix='/api/v1')
 app.secret_key = Config.SECRET_KEY
 
 # 기본 디렉토리 설정
