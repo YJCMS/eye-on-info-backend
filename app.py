@@ -3,7 +3,8 @@ import os
 from routes.crawl_routes import crawl_bp
 from routes.analysis_routes import analysis_bp
 from services.pdf_analysis_service import PDFAnalysisService
-from services.Protest_info_search_service import ProtestInfoSearchService
+from services.protest_info_search_service import ProtestInfoSearchService
+from services.protest_url_crawler_service import ProtestUrlCrawlerService
 from config import Config
 
 app = Flask(__name__)
@@ -20,6 +21,7 @@ os.makedirs(text_dir, exist_ok=True)
 # 서비스 초기화
 pdf_service = PDFAnalysisService(pdf_dir)
 search_service = ProtestInfoSearchService()
+protest_url_crawler_service = ProtestUrlCrawlerService()
 
 def handle_response(success, message, status_code=200):
     """API 응답 처리를 위한 유틸리티 함수"""
@@ -84,6 +86,39 @@ def analyze_pdf():
         flash(f'PDF 분석 중 오류가 발생했습니다: {str(e)}', 'error')
     
     return redirect(url_for('index'))
+
+@app.route('/auto', methods=['GET'])
+def auto_scheduler():
+    try:
+        # 1단계: 크롤링 및 PDF 다운로드
+        todays_info = protest_url_crawler_service.execute_and_get_final_url()
+        pdf_service.download_pdf_from_url(todays_info)
+        pdf_path = os.path.join(pdf_dir, 'protest-info-pdf.pdf')
+        
+        # 2단계: PDF 파일 존재 확인
+        if not os.path.exists(pdf_path):
+            return handle_response(False, "분석할 PDF 파일이 없습니다.", 404)
+        
+        # 3단계: 시위 정보를 텍스트로 저장
+        if not search_service.save_protest_info_to_txt():
+            return handle_response(False, "뉴스 정보 가져오기 실패", 500)
+            
+        # 4단계: PDF 분석 및 결과 전송
+        result = pdf_service.analyze_pdf(pdf_path)
+        if not result:
+            return handle_response(False, "PDF 분석 중 오류가 발생했습니다.", 500)
+            
+        success = pdf_service.send_to_server(result)
+        if not success:
+            return handle_response(False, "분석 결과 전송 중 오류가 발생했습니다.", 500)
+        
+        # 5단계: 뉴스 정보와 함께 성공 응답 반환
+        with open(os.path.join(text_dir, 'news_info.txt'), 'r', encoding='utf-8') as f:
+            return handle_response(True, f.read())
+            
+    except Exception as e:
+        return handle_response(False, f"처리 중 오류 발생: {str(e)}", 500)
+    
 
 # 전역 에러 핸들러
 @app.errorhandler(404)

@@ -97,6 +97,10 @@ class PDFAnalysisService:
 
     def save_pdf(self, content):
         pdf_path = os.path.join(self.pdf_dir, 'protest-info-pdf.pdf')
+    
+        # 디렉토리가 없으면 생성
+        os.makedirs(self.pdf_dir, exist_ok=True)
+        
         with open(pdf_path, 'wb') as f:
             f.write(content)
 
