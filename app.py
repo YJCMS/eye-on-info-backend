@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, flash, url_for, redirect, jsonify
 import os
 from services.pdf_analysis_service import PDFAnalysisService
-from services.protest_info_search_service import ProtestInfoSearchService
+from services.Protest_info_search_service import ProtestInfoSearchService
 from services.protest_url_crawler_service import ProtestUrlCrawlerService
 from config import Config
 
