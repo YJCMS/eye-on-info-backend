@@ -48,11 +48,7 @@ class ProtestInfoSearchService:
             'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
         ]
         
-        user = random.choice(user_agents)
-        chrome_options.add_argument(f'user-agent={user}')
-        
-        # 에이전트 확인
-        print(user)
+        chrome_options.add_argument(f'user-agent={random.choice(user_agents)}')
         
         # 추가 옵션으로 탐지 회피 향상
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
