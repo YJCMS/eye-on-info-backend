@@ -1,129 +1,184 @@
-from flask import Flask, render_template, request, flash, url_for, redirect, jsonify
+import datetime
+import requests
+from bs4 import BeautifulSoup
 import os
-from services.pdf_analysis_service import PDFAnalysisService
-from services.Protest_info_search_service import ProtestInfoSearchService
-from services.protest_url_crawler_service import ProtestUrlCrawlerService
+import json
+from utils.prompt_utils import load_prompt
 from config import Config
 
-app = Flask(__name__)
-app.secret_key = Config.SECRET_KEY
-
-# 기본 디렉토리 설정
-pdf_dir = os.path.join('static', 'pdf')
-text_dir = os.path.join('static', 'text')
-os.makedirs(pdf_dir, exist_ok=True)
-os.makedirs(text_dir, exist_ok=True)
-
-# 서비스 초기화
-pdf_service = PDFAnalysisService(pdf_dir)
-search_service = ProtestInfoSearchService()
-protest_url_crawler_service = ProtestUrlCrawlerService()
-
-def handle_response(success, message, status_code=200):
-    """API 응답 처리를 위한 유틸리티 함수"""
-    response = {"status": "success" if success else "error", "message": message}
-    return jsonify(response), status_code if not success else 200
-
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    try:
-        # 뉴스 텍스트 읽기
-        news_text = None
-        news_file_path = os.path.join(text_dir, 'news_info.txt')
-        if os.path.exists(news_file_path):
-            with open(news_file_path, 'r', encoding='utf-8') as f:
-                news_text = f.read()
-
-        # POST 요청 처리
-        if request.method == 'POST':
-            if 'url' in request.form and request.form['url']:
-                success, message = pdf_service.download_pdf_from_url(request.form['url'])
-            elif 'file' in request.files:
-                success, message = pdf_service.upload_pdf(request.files['file'])
-            flash(message, 'success' if success else 'error')
-
-        return render_template('index.html', news_text=news_text)
-
-    except Exception as e:
-        flash('처리 중 오류가 발생했습니다.', 'error')
-        return render_template('index.html')
-
-@app.route('/get_news_text', methods=['GET'])
-def get_news_text():
-    try:
-        if not search_service.save_protest_info_to_txt():
-            return handle_response(False, "뉴스 정보 가져오기 실패", 500)
-
-        with open(os.path.join(text_dir, 'news_info.txt'), 'r', encoding='utf-8') as f:
-            return handle_response(True, f.read())
-
-    except Exception as e:
-        return handle_response(False, "뉴스 처리 중 오류 발생", 500)
-
-@app.route('/analyze_pdf', methods=['POST'])
-def analyze_pdf():
-    pdf_path = os.path.join(pdf_dir, 'protest-info-pdf.pdf')
+class ProtestInfoPostService:
     
-    if not os.path.exists(pdf_path):
-        flash('분석할 PDF 파일이 없습니다. 먼저 파일을 업로드해주세요.', 'error')
-        return redirect(url_for('index'))
+    def __init__(self):
+        self.api_key = Config.CLAUDE_API_KEY
+        self.api_url = Config.CLAUDE_API_URL
+
+    @staticmethod
+    def fetch_triangle_sentences():
+        list_url = "https://news.nate.com/hissue/list?isq=9890&mid=n0412&type=c"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+        }
+
+        try:
+            # 1. 뉴스 목록 페이지에서 첫 번째 링크 추출
+            res = requests.get(list_url, headers=headers)
+            soup = BeautifulSoup(res.text, 'html.parser')
+            first_link_tag = soup.select_one('.mduSubjectList .mlt01 a')
+            if not first_link_tag:
+                return [], "뉴스 링크를 찾을 수 없습니다."
+
+            first_link = first_link_tag['href']
+            news_url = "https:" + first_link if first_link.startswith("//") else first_link
+
+            # 2. 뉴스 본문 요청
+            news_res = requests.get(news_url, headers=headers)
+            news_soup = BeautifulSoup(news_res.text, 'html.parser')
+            content_div = news_soup.select_one('#realArtcContents')
+
+            if not content_div:
+                return [], "본문을 찾을 수 없습니다."
+
+            lines = [line.strip() for line in content_div.stripped_strings]
+            triangle_lines = [line for line in lines if '▲' in line]
+
+            if not triangle_lines:
+                return [], "▲ 문자가 포함된 문장을 찾지 못했습니다."
+
+            # 3. 파일 저장
+            filepath='static/text/news_info.txt'
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            with open(filepath, 'w', encoding='utf-8') as f:
+                for line in triangle_lines:
+                    f.write(line + "\n")
+
+            return triangle_lines, None
+
+        except Exception as e:
+            return [], str(e)
     
-    try:
-        result = pdf_service.analyze_pdf(pdf_path)
-        if result:
-            success = pdf_service.send_to_server(result)
-            if success:
-                flash('PDF 분석이 완료되었습니다.', 'success')
+    def _read_news_text(self, file_path):
+        """뉴스 텍스트 파일을 읽어 내용을 반환하는 메서드"""
+        try:
+            if not os.path.exists(file_path):
+                print(f"Warning: File does not exist: {file_path}")
+                return ""
+                
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            print(f"Error reading news text: {e}")
+            return ""
+        
+    def analyze_protest_info(self, prompt_file='pdf_analysis_prompt.txt', news_file='static/text/news_info.txt'):
+        """시위 정보를 분석하는 메서드"""
+        try:
+            prompt = load_prompt(prompt_file)
+            if not prompt:
+                return None
+            
+            current_date = datetime.datetime.now().strftime('%Y년 %m월 %d일')
+            
+            # 텍스트 파일
+            news_text = self._read_news_text(news_file)
+            if not news_text:
+                print(f"Warning: Could not read news text from {news_file}")
+                news_text = "No news information available."
+
+            headers = {
+                'x-api-key': self.api_key,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json',
+            }
+
+            data = {
+                'model': 'claude-3-5-sonnet-20241022',
+                'max_tokens': 8192,
+                'messages': [{
+                    'role': 'user',
+                    'content': [
+                        {
+                            'type': 'text',
+                            'text': f"시위 날짜는 {current_date}이야\n{news_text}\n{prompt}"
+                        }
+                    ]
+                }]
+            }
+            
+            print("API 요청 데이터:", json.dumps(data, ensure_ascii=False, indent=2))
+            print("Claude API에 요청을 보내는 중...")
+
+            response = requests.post(self.api_url, headers=headers, json=data)
+            
+            if response.status_code != 200:
+                print(f"API 오류: {response.status_code}")
+                print(f"오류 응답: {response.text}")
+                return None
+
+            print("API 요청 성공")
+            # 분석 결과, content의 text 내용만 확인
+            response_data = response.json()
+            text_content = response_data['content'][0]['text']
+            # indent=2로 설정하여 들여쓰기를 적용하고, ensure_ascii=False로 한글이 깨지지 않도록 설정
+            print(json.dumps(json.loads(text_content), indent=2, ensure_ascii=False))
+            return response_data
+            
+        except Exception as e:
+            print(f"시위 정보 분석 중 예외 발생: {e}")
+            import traceback
+            print(traceback.format_exc())
+            return None
+        
+    def send_to_server(self, analysis_result):
+        """분석 결과를 특정 서버로 전송"""
+        try:
+            # API 응답에서 JSON 데이터만 추출
+            if isinstance(analysis_result, dict) and 'content' in analysis_result:
+                # content 배열의 첫 번째 항목에서 text 추출
+                json_str = analysis_result['content'][0]['text']
+                # JSON 문자열을 파싱하여 실제 데이터 얻기
+                data_to_send = json.loads(json_str)
             else:
-                flash('분석 결과 전송 중 오류가 발생했습니다.', 'error')
-        else:
-            flash('PDF 분석 중 오류가 발생했습니다.', 'error')
-    except Exception as e:
-        flash(f'PDF 분석 중 오류가 발생했습니다: {str(e)}', 'error')
+                data_to_send = analysis_result
+
+            response = requests.post(
+                Config.TARGET_SERVER_URL,
+                json=data_to_send,  # 파싱된 JSON 데이터만 전송
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            print(f"\nServer Response Status: {response.status_code}")
+            print(f"Server Response Content: {response.text}")
+            
+            response.raise_for_status()
+            return True
+        
+        except requests.exceptions.RequestException as e:
+            print(f"\nServer Error Details:")
+            print(f"Status Code: {e.response.status_code if hasattr(e, 'response') else 'N/A'}")
+            print(f"Error Message: {e.response.text if hasattr(e, 'response') else str(e)}")
+            return False
+        
+        except Exception as e:
+            print(f"\nUnexpected Error: {str(e)}")
+            return False
+
+# 사용 예시
+if __name__ == "__main__":
+    service = ProtestInfoPostService()
     
-    return redirect(url_for('index'))
-
-@app.route('/auto', methods=['GET'])
-def auto_scheduler():
-    try:
-        # 1단계: 크롤링 및 PDF 다운로드
-        todays_info = protest_url_crawler_service.execute_and_get_final_url()
-        pdf_service.download_pdf_from_url(todays_info)
-        pdf_path = os.path.join(pdf_dir, 'protest-info-pdf.pdf')
+    # 1. 뉴스에서 삼각형(▲) 포함된 문장 추출
+    triangle_sentences, error = ProtestInfoPostService.fetch_triangle_sentences()
+    if error:
+        print(f"Error fetching triangle sentences: {error}")
+    else:
+        print(f"Found {len(triangle_sentences)} triangle sentences")
         
-        # 2단계: PDF 파일 존재 확인
-        if not os.path.exists(pdf_path):
-            return handle_response(False, "분석할 PDF 파일이 없습니다.", 404)
-        
-        # 3단계: 시위 정보를 텍스트로 저장
-        if not search_service.save_protest_info_to_txt():
-            return handle_response(False, "뉴스 정보 가져오기 실패", 500)
-            
-        # 4단계: PDF 분석 및 결과 전송
-        result = pdf_service.analyze_pdf(pdf_path)
-        if not result:
-            return handle_response(False, "PDF 분석 중 오류가 발생했습니다.", 500)
-            
-        success = pdf_service.send_to_server(result)
-        if not success:
-            return handle_response(False, "분석 결과 전송 중 오류가 발생했습니다.", 500)
-        
-        # 5단계: 뉴스 정보와 함께 성공 응답 반환
-        with open(os.path.join(text_dir, 'news_info.txt'), 'r', encoding='utf-8') as f:
-            return handle_response(True, f.read())
-            
-    except Exception as e:
-        return handle_response(False, f"처리 중 오류 발생: {str(e)}", 500)
+    # 2. 시위 정보 분석
+    analysis_result = service.analyze_protest_info()
     
-
-# 전역 에러 핸들러
-@app.errorhandler(404)
-def not_found_error(error):
-    return handle_response(False, "페이지를 찾을 수 없습니다", 404)
-
-@app.errorhandler(500)
-def internal_error(error):
-    return handle_response(False, "서버 오류가 발생했습니다", 500)
-
-if __name__ == '__main__':
-    app.run('0.0.0.0', port=5001, debug=True)
+    # 3. 분석 결과 서버 전송
+    if analysis_result:
+        success = service.send_to_server(analysis_result)
+        print(f"Server transmission {'successful' if success else 'failed'}")
+    else:
+        print("No analysis result to send")

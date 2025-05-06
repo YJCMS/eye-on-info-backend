@@ -131,17 +131,21 @@ class PDFAnalysisService:
 
             data = {
                 'model': 'claude-3-5-sonnet-20241022',
-                'max_tokens': 4096,
+                'max_tokens': 8192,
+                'temperature': 0.5,
+                'system': "당신은 도움이 되는 AI 어시스턴트입니다.",
                 'messages': [{
                     'role': 'user',
                     'content': [
                         {
                             'type': 'text',
-                            'text': f"{prompt}\n\nPDF Content:\n{pdf_text}\nText file Content:\n{news_text}"
+                            'text': f"'▲가 포함된 텍스트 :' {news_text}\n {prompt}"
                         }
                     ]
                 }]
             }
+            
+            print(data)
 
             print("Sending request to Claude API...")
 
